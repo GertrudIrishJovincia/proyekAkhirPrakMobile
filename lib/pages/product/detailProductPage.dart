@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:proyekakhir/components/customWidgets/button.dart';
 import 'package:proyekakhir/components/customWidgets/image.dart';
 import 'package:proyekakhir/config/app/appColor.dart';
@@ -8,7 +7,6 @@ import 'package:proyekakhir/helpers/moneyFormat.dart';
 import 'package:custom_radio_grouped_button/custom_radio_grouped_button.dart';
 import 'package:proyekakhir/models/product.dart';
 import 'package:proyekakhir/pages/cart/cartPage.dart';
-import 'package:proyekakhir/providers/cardProviders.dart';
 import 'package:proyekakhir/services/apiservice.dart';
 import 'package:proyekakhir/util/local_storage.dart';
 
@@ -24,6 +22,8 @@ class DetailProductPage extends StatefulWidget {
 class _DetailProductPageState extends State<DetailProductPage> {
   late Future<Product> _futureProduct;
   bool isFavorite = false;
+  bool isAddingToCart = false;
+  String selectedSize = '16 cm'; // Default size
 
   @override
   void initState() {
@@ -59,6 +59,72 @@ class _DetailProductPageState extends State<DetailProductPage> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Ditambahkan ke favorit')));
+    }
+  }
+
+  Future<void> addToCart(Product product) async {
+    setState(() {
+      isAddingToCart = true;
+    });
+
+    try {
+      // Create cart item with selected size
+      final cartItem = {
+        'id': '${product.id}_$selectedSize', // Make ID unique with size
+        'productId': product.id, // Keep original product ID
+        'productName': '${product.productName} ($selectedSize)',
+        'productPrice': product.productPrice,
+        'productImage': product.productImage,
+        'category': product.category,
+        'size': selectedSize,
+        'addedAt': DateTime.now().millisecondsSinceEpoch,
+      };
+
+      // Check if item already exists in cart
+      List<Map<String, dynamic>> existingItems =
+          await LocalStorage.getCartItems();
+      bool itemExists = existingItems.any(
+        (item) => item['id'] == cartItem['id'],
+      );
+
+      if (itemExists) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${product.productName} ($selectedSize) sudah ada di keranjang',
+            ),
+            backgroundColor: AppColor.yellow,
+          ),
+        );
+      } else {
+        await LocalStorage.addCartItem(cartItem);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${product.productName} berhasil ditambahkan ke keranjang',
+            ),
+            backgroundColor: AppColor.primary,
+          ),
+        );
+
+        // Navigate to cart page
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const CartPage()),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error menambahkan ke keranjang: $e'),
+          backgroundColor: AppColor.red,
+        ),
+      );
+    } finally {
+      setState(() {
+        isAddingToCart = false;
+      });
     }
   }
 
@@ -149,6 +215,18 @@ class _DetailProductPageState extends State<DetailProductPage> {
                     textAlign: TextAlign.justify,
                   ),
                   const SizedBox(height: 16),
+
+                  // Size Selection Label
+                  Text(
+                    'Pilih Ukuran:',
+                    style: AppFont.nunitoSansSemiBold.copyWith(
+                      color: AppColor.dark,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Size Selection Radio Buttons
                   CustomRadioButton(
                     elevation: 0,
                     enableShape: true,
@@ -166,7 +244,11 @@ class _DetailProductPageState extends State<DetailProductPage> {
                     width: 80,
                     padding: 8,
                     spacing: 1,
+                    defaultSelected: selectedSize,
                     radioButtonValue: (value) {
+                      setState(() {
+                        selectedSize = value;
+                      });
                       debugPrint('Selected size: $value');
                     },
                     selectedColor: AppColor.primary,
@@ -210,56 +292,60 @@ class _DetailProductPageState extends State<DetailProductPage> {
           return Container(
             height: 80,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: const BoxDecoration(color: AppColor.white),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Total price',
-                      style: AppFont.nunitoSansRegular.copyWith(
-                        fontSize: 12,
-                        color: AppColor.grayWafer,
-                      ),
-                    ),
-                    Text(
-                      formatIDRCurrency(number: product.productPrice ?? 0),
-                      style: AppFont.nunitoSansBold.copyWith(
-                        fontSize: 18,
-                        color: AppColor.primary,
-                      ),
-                    ),
-                  ],
-                ),
-                PillsButton(
-                  onPressed: () {
-                    // Add product to cart
-                    final cartItem = {
-                      'id': product.id,
-                      'productName': product.productName,
-                      'productPrice': product.productPrice,
-                      'productImage': product.productImage,
-                      'category': product.category,
-                    };
-                    Provider.of<CartProvider>(
-                      context,
-                      listen: false,
-                    ).addItem(cartItem);
-
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const CartPage()),
-                    );
-                  },
-                  fullWidthButton: false,
-                  text: 'Add to cart',
-                  fontSize: 16,
-                  paddingSize: 24,
+            decoration: BoxDecoration(
+              color: AppColor.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.2),
+                  spreadRadius: 1,
+                  blurRadius: 5,
+                  offset: const Offset(0, -2),
                 ),
               ],
+            ),
+            child: SafeArea(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Total price ($selectedSize)',
+                          style: AppFont.nunitoSansRegular.copyWith(
+                            fontSize: 12,
+                            color: AppColor.grayWafer,
+                          ),
+                        ),
+                        Text(
+                          formatIDRCurrency(
+                            number: (product.productPrice ?? 0).toInt(),
+                          ),
+                          style: AppFont.nunitoSansBold.copyWith(
+                            fontSize: 18,
+                            color: AppColor.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  SizedBox(
+                    width: 140,
+                    child: PillsButton(
+                      onPressed: isAddingToCart
+                          ? null
+                          : () => addToCart(product),
+                      fullWidthButton: false,
+                      text: isAddingToCart ? 'Adding...' : 'Add to cart',
+                      fontSize: 16,
+                      paddingSize: 24,
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         },

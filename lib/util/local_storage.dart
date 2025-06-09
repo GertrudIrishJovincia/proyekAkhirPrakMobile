@@ -1,17 +1,19 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class LocalStorage {
   static const String _keyLogin = 'is_logged_in';
   static const String _keyUsername = 'username';
   static const String _keyFavoriteIds = 'favorite_ids';
-  static const String _keyUserEmail = 'user_email'; // Tambahan untuk email
+  static const String _keyUserEmail = 'user_email';
+  static const String _keyCartItems = 'cart_items'; // Key baru untuk cart
 
   // Simpan status login dan username
   static Future<void> login(String username) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyLogin, true);
     await prefs.setString(_keyUsername, username);
-    await prefs.setString(_keyUserEmail, username); // Simpan email juga
+    await prefs.setString(_keyUserEmail, username);
   }
 
   static Future<bool> isLoggedIn() async {
@@ -110,5 +112,83 @@ class LocalStorage {
       ids.remove(id);
       await setFavoriteIds(ids);
     }
+  }
+
+  // === FUNGSI CART BARU ===
+
+  // Ambil semua item cart dari SharedPreferences
+  static Future<List<Map<String, dynamic>>> getCartItems() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? cartData = prefs.getString(_keyCartItems);
+
+    if (cartData != null) {
+      List<dynamic> decoded = json.decode(cartData);
+      return decoded.cast<Map<String, dynamic>>();
+    }
+
+    return [];
+  }
+
+  // Simpan semua item cart ke SharedPreferences
+  static Future<void> setCartItems(List<Map<String, dynamic>> items) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String encoded = json.encode(items);
+    await prefs.setString(_keyCartItems, encoded);
+  }
+
+  // Tambah item ke cart
+  static Future<void> addCartItem(Map<String, dynamic> item) async {
+    List<Map<String, dynamic>> items = await getCartItems();
+
+    // Cek apakah item sudah ada di cart berdasarkan ID
+    bool itemExists = items.any(
+      (existingItem) => existingItem['id'] == item['id'],
+    );
+
+    if (!itemExists) {
+      items.add(item);
+      await setCartItems(items);
+    }
+  }
+
+  // Hapus item dari cart berdasarkan index
+  static Future<void> removeCartItem(int index) async {
+    List<Map<String, dynamic>> items = await getCartItems();
+
+    if (index >= 0 && index < items.length) {
+      items.removeAt(index);
+      await setCartItems(items);
+    }
+  }
+
+  // Hapus item dari cart berdasarkan ID
+  static Future<void> removeCartItemById(String id) async {
+    List<Map<String, dynamic>> items = await getCartItems();
+    items.removeWhere((item) => item['id'] == id);
+    await setCartItems(items);
+  }
+
+  // Kosongkan seluruh cart
+  static Future<void> clearCart() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_keyCartItems);
+  }
+
+  // Hitung total harga cart
+  static Future<double> getCartTotalPrice() async {
+    List<Map<String, dynamic>> items = await getCartItems();
+    double total = 0.0;
+
+    for (var item in items) {
+      total += (item['productPrice'] ?? 0).toDouble();
+    }
+
+    return total;
+  }
+
+  // Hitung jumlah item di cart
+  static Future<int> getCartItemCount() async {
+    List<Map<String, dynamic>> items = await getCartItems();
+    return items.length;
   }
 }
