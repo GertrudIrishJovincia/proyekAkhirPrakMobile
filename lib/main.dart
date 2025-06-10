@@ -7,10 +7,14 @@ import 'package:proyekakhir/pages/dashboard/dashboard.dart';
 import 'package:proyekakhir/providers/cardProviders.dart';
 import 'package:proyekakhir/providers/favoriteProvider.dart';
 import 'package:proyekakhir/routes/authRoutes.dart';
+import 'package:proyekakhir/services/hive_service.dart'; // Import HiveService
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Hive first
+  await HiveService.init();
 
   // Cek status login
   SharedPreferences prefs = await SharedPreferences.getInstance();

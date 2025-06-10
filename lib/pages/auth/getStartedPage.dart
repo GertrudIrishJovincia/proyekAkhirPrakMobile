@@ -44,7 +44,7 @@ class GetStartedPage extends StatelessWidget {
                   const Spacer(),
                   Center(
                     child: Text(
-                      'Hassle-Free Ordering',
+                      'Hassle-Free Orderingst',
                       style: AppFont.nunitoSansBlack.copyWith(
                         fontSize: 20,
                         color: AppColor.darkLighter,
